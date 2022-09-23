@@ -1,0 +1,65 @@
+id: teleskop_reader
+label: Reader
+category: '[teleskop]'
+
+templates:
+  imports: import teleskop
+  make: teleskop.reader(${filename}, '${pol.code}', ${lochan}, ${hichan}, '${type.numpy}', ${repeat.val})
+
+parameters:
+- id: type
+  label: Type
+  dtype: enum
+  options: [complex]
+  option_labels: [complex]
+  option_attributes:
+    numpy: ["complex64"]
+    grc: ["fc32"]
+  hide: part
+
+- id: filename
+  label: "Filename"
+  dtype: file_open
+
+- id: repeat
+  label: Repeat
+  dtype: enum
+  options: ['Yes', 'No']
+  option_labels: ['Yes', 'No']
+  option_attributes:
+    val: [True, False]
+  hide: part
+
+- id: pol
+  label: Polarizations
+  dtype: enum
+  default: 'XY'
+  options: ['X', 'Y', 'XY']
+  option_labels: ['X', 'Y', 'XY']
+  option_attributes:
+    n_taps: [1, 1, 2]
+    code: ['X', 'Y', 'XY']
+  hide: part
+
+- id: lochan
+  label: Lower Channel
+  dtype: int
+  default: 0
+  hide: part
+
+- id: hichan
+  label: Upper Channel
+  dtype: int
+  default: 0
+  hide: part
+
+inputs:
+# empty
+
+outputs:
+- domain: stream
+  multiplicity: ${ pol.n_taps }
+  dtype: ${ type.grc }
+  optional: true
+
+file_format: 1
