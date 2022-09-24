@@ -18,7 +18,7 @@ class reader(gr.basic_block):
     """
     docstring for block reader
     """
-    def __init__(self, filename, pol, lochan, hichan, dtype, repeat):
+    def __init__(self, filename, pol, lochan, hichan, dtype, repeat, aspect):
         self.pol = pol
         self.npol = 2 if pol == "XY" else 1
         self.lochan = lochan
@@ -26,9 +26,20 @@ class reader(gr.basic_block):
         self.dtype = dtype
         self.filename = filename
         self.repeat = repeat
+        self.aspect = aspect
         self.first = True
 
         self._start_reader()
+
+        if self.raw.nbeams != -1:
+            self.NASPC = self.raw.nbeams
+
+        if self.raw.nants != -1 and self.raw.nbeams == -1:
+            self.NASPC = self.raw.nants
+        else:
+            self.NASPC = 1
+
+        self.NFREQ = int(self.raw.obsnchan / self.NASPC)
 
         print("FILE METADATA", "=" * (80 - 14))
         print(f"Filename: {self.filename}")
@@ -38,10 +49,11 @@ class reader(gr.basic_block):
         print(f"BLOCSIZE: {self.raw.blocsize}")
         print(f"OBSNCHAN: {self.raw.obsnchan}")
         print(f"NPOL: {self.raw.npol}")
-        print("PROCESSING", "=" * (80 - 11))
-        print(f"Input data shape: ({self.raw.obsnchan}, {self.raw.nsamps_per_block}, {self.raw.npol})")
-        print(f"IFFT size: ({self.raw.obsnchan}, {self.raw.nsamps_per_block})")
-        print(f"Output data shape: ({self.raw.obsnchan*self.raw.nsamps_per_block}, {self.raw.npol})")
+
+        if self.aspect > self.NASPC - 1:
+            raise AssertionError(f"Aspect index requested ({self.aspect}) larger than "
+                                 f"the number of aspects indexes provided by the GUPPI file "
+                                 f"({self.NASPC - 1}).")
 
         if self.npol > self.raw.npol:
             raise AssertionError(f"Number of polarizations requested ({self.npol}) larger than "
@@ -49,14 +61,14 @@ class reader(gr.basic_block):
 
         if self.lochan == 0 and self.hichan == 0:
             self.lochan = 0
-            self.hichan = self.raw.obsnchan
+            self.hichan = self.NFREQ
 
         if self.lochan > self.hichan:
             raise AssertionError(f"Invalid channel selection.")
 
-        if self.lochan < 0 or self.hichan > self.raw.obsnchan:
+        if self.lochan < 0 or self.hichan > self.NFREQ:
             raise AssertionError(f"Channel bounds requested ({self.lochan}, {self.hichan}) "
-                                 f"incompatible with the GUPPI file (0, {self.raw.obsnchan}).")
+                                 f"incompatible with the GUPPI file (0, {self.NFREQ}).")
 
         self._start_buffer()
 
@@ -72,7 +84,7 @@ class reader(gr.basic_block):
         self.raw = guppi.Guppi(self.filename)
 
     def _start_buffer(self):
-        self.buffer_size = self.raw.obsnchan * self.raw.nsamps_per_block
+        self.buffer_size = self.NFREQ * self.raw.nsamps_per_block
 
         self.buffer = []
         for _ in range(self.npol):
@@ -95,8 +107,9 @@ class reader(gr.basic_block):
             hdr, data = self.raw.read_next_block()
 
             if self.first:
-                lo_freq = hdr['OBSFREQ'] + (self.lochan * (hdr['OBSBW'] / hdr['OBSNCHAN']))
-                hi_freq = hdr['OBSFREQ'] + (self.hichan * (hdr['OBSBW'] / hdr['OBSNCHAN']))
+                s_freq = hdr['OBSFREQ'] - (hdr['OBSBW'] / 2)
+                lo_freq = s_freq + (self.lochan * hdr['CHAN_BW'])
+                hi_freq = s_freq + (self.hichan * hdr['CHAN_BW'])
                 md_freq = (lo_freq + hi_freq) / 2 
 
                 print("FILE HEADER", "=" * (80 - 12))
@@ -114,6 +127,9 @@ class reader(gr.basic_block):
                 if self.repeat:
                     self._start_reader()
                 return 0
+
+            if len(data.shape) == 4:
+                data = data[self.aspect, ...]
 
             if self.pol == "X":
                 self.buffer[0].put(self._parse_data(data[:, :, 0]))

@@ -4,7 +4,7 @@ category: '[teleskop]'
 
 templates:
   imports: import teleskop
-  make: teleskop.reader(${filename}, '${pol.code}', ${lochan}, ${hichan}, '${type.numpy}', ${repeat.val})
+  make: teleskop.reader(${filename}, '${pol.code}', ${lochan}, ${hichan}, '${type.numpy}', ${repeat.val}, ${aspect})
 
 parameters:
 - id: type
@@ -39,6 +39,12 @@ parameters:
   option_attributes:
     n_taps: [1, 1, 2]
     code: ['X', 'Y', 'XY']
+  hide: part
+
+- id: aspect
+  label: Aspect
+  dtype: int
+  default: 0
   hide: part
 
 - id: lochan
