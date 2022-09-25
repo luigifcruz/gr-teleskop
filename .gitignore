@@ -1,2 +1,3 @@
+examples/*.py
 build
 .DS_Store
