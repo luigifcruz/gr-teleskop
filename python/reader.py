@@ -126,26 +126,26 @@ class reader(gr.basic_block):
             if data is None:
                 if self.repeat:
                     self._start_reader()
-                return 0
+            else:
+                if len(data.shape) == 4:
+                    data = data[self.aspect, ...]
 
-            if len(data.shape) == 4:
-                data = data[self.aspect, ...]
+                if self.pol == "X":
+                    self.buffer[0].put(self._parse_data(data[:, :, 0]))
 
-            if self.pol == "X":
-                self.buffer[0].put(self._parse_data(data[:, :, 0]))
+                if self.pol == "Y":
+                    self.buffer[0].put(self._parse_data(data[:, :, 1]))
 
-            if self.pol == "Y":
-                self.buffer[0].put(self._parse_data(data[:, :, 1]))
+                if self.pol == "XY":
+                    self.buffer[0].put(self._parse_data(data[:, :, 0]))
+                    self.buffer[1].put(self._parse_data(data[:, :, 1]))
 
-            if self.pol == "XY":
-                self.buffer[0].put(self._parse_data(data[:, :, 0]))
-                self.buffer[1].put(self._parse_data(data[:, :, 1]))
+        produce = min(len(output_items[0]), self.buffer[0].occupancy)
+        if not produce and not self.repeat:
+            return gr.WORK_DONE
 
-        if len(output_items[0]) > self.buffer[0].occupancy:
-            return 0 
+        if produce:
+            for p in range(self.npol):
+                self.buffer[p].get(output_items[p][:produce])
 
-        for p in range(self.npol):
-            self.buffer[p].get(output_items[p])
-
-        return len(output_items[0])
-
+        return produce
